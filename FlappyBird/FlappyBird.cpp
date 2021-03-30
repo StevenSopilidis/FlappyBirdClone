@@ -1,6 +1,8 @@
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include <SFML/Graphics.hpp>
+#include "Pipe.h"
 
 using namespace sf;
 //func to return the size we need the backgroundSprite to be resized to
@@ -18,9 +20,9 @@ const int WINDOW_WIDTH = 640.0f;
 const int WINDOW_HEIGHT = 480.0f;
 
 //how much height will the bird gain every time the user flaps the wings
-const int WINGS_FLAPPED = 700;
+const int WINGS_FLAPPED = 750;
 //how much height the bird is losing if not wings were flopeed
-const int HEIGHT_LOSS = 120;
+const int HEIGHT_LOSS = 200;
 
 //max number of pipes in the screen
 const int MAX_PIPES_IN_SCREEN = 2;
@@ -55,24 +57,23 @@ int main()
 	birdSprite.setTexture(birdTexture1);
 	//set the original position of the bird
 	birdSprite.setPosition(50, 240);
-
-
-	//setup for the pipes
-	Sprite topPipe;
-	//code for top pipe
-	topPipe.setTexture(pipeTexture);
-	//generate a rand scale for the pipe between 0.4 and 1.3
-	srand(time(0) +60);
-	float random_height_scale = ( rand() % 16 ) + 0.2;
-	random_height_scale = random_height_scale / 10;
-	topPipe.setScale(1, random_height_scale);
-	topPipe.setPosition(WINDOW_WIDTH - 300, WINDOW_HEIGHT - (320 * random_height_scale));
-
-	//code for bottom pipe
-
+	
+	std::vector<Pipe *> pipes;
+	pipes.push_back(new Pipe(pipeTexture, WINDOW_WIDTH, WINDOW_HEIGHT));
 
 	//my var to keep count of the rotation of the bird
 	float birdRot = 0.f;
+
+	//score of the player
+	Font textFont;
+	textFont.loadFromFile("fonts/KOMIKAP_.ttf");
+	int score = 0;
+	Text scoreText;
+	scoreText.setFont(textFont);
+	scoreText.setCharacterSize(17);
+	scoreText.setPosition(10, 10);
+	scoreText.setFillColor(Color::White);
+	scoreText.setString("Score = 0");
 
 	Clock clock;
 	while (window.isOpen())
@@ -93,17 +94,49 @@ int main()
 		}
 		changeBirdRotation(birdSprite, dt, birdRot);
 		decreaseBirdHeight(birdSprite, dt);
+		//check if the player has hit the bottom pipe (heightof pipe - height of bird)
+		if ((WINDOW_HEIGHT - birdSprite.getPosition().y) <= pipes[0]->bottom_pipe_height
+			&& pipes[0]->bottomPipe.getPosition().x >= 50
+			&& pipes[0]->bottomPipe.getPosition().x <= 86)
+		{
+			window.close();     
+		}
+		//check if the player has hit the top pipe
+		if (birdSprite.getPosition().y <= pipes[0]->top_pipe_height
+			&& pipes[0]->bottomPipe.getPosition().x >= 50
+			&& pipes[0]->bottomPipe.getPosition().x <= 86)
+		{
+			window.close();
+		}
+		//loop throught the pipe arrray and apply the updatePipePosition func
+		for (auto pipe : pipes)
+		{
+			pipe->updatePipePosition(dt);
+		}
+
 		//check if the bird has hit the roof or the bottom
 		bool lost = playerHasLost(birdSprite, window);
 		if (lost)
 		{
-			//window.close();
+			window.close();
 		}
-
+		std::cout << score << std::endl;
 		window.clear();
 		window.draw(backgroundSprite);
 		window.draw(birdSprite);
-		window.draw(topPipe);
+		//draw the pipes
+		for (auto pipe : pipes)
+		{
+			window.draw(pipe->bottomPipe);
+			window.draw(pipe->topPipe);
+		}
+		//update the score text
+		std::stringstream ss;
+		ss << "Score = " << score;
+		scoreText.setString(ss.str());
+
+		window.draw(scoreText);
+		Pipe::genNewPipe(pipes, pipeTexture,WINDOW_WIDTH,WINDOW_HEIGHT,score);
 		window.display();
 	};
 	return 0;
@@ -148,9 +181,9 @@ void changeBirdRotation(Sprite& birdSprite, Time& dt, float& birdRot)
 }
 bool playerHasLost(Sprite& birdSprite, RenderWindow& window)
 {
+	//if bird git the bottom or top
 	if (birdSprite.getPosition().y <= 0 || birdSprite.getPosition().y >= WINDOW_HEIGHT)
 	{
-		//end the game
 		return true;
 	}
 
